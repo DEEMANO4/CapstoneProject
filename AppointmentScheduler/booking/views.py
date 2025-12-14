@@ -66,7 +66,7 @@ class AppointmentUpdateView(LoginRequiredMixin, UpdateView):
         return super().form_valid(form)
     
 def load_available_timeslots(request):
-    employee_id = request.GET,get('emplyee_id')
+    employee_id = request.GET.get('emplyee_id')
     service_id = request.GET.get('service_id')
 
     timeslots = TimeSlot.objects.filter(employee_id=employee_id, is_booked= False, service_id=service_id).order_by('start_time')

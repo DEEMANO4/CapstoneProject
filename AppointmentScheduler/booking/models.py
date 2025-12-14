@@ -32,9 +32,10 @@ class TimeSlot(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     is_available = models.BooleanField(default=True)
+    is_booked = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('employee', 'date', 'start_time')
+        unique_together = ('employee', 'date', 'start_time', 'end_time')
 
     def __str__(self):
         return f"{self.employee.name} - {self.date} {self.start_time}-{self.end_time}"
@@ -45,7 +46,7 @@ class Appointment(models.Model):
     service_offered = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service')
     employee_available = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='employees available')
     # service_id = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service id')
-    time_slot = models.ForeignKey(Timeslot, on_delete=models.CASCADE, related_name='timeslots_available' )
+    time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE, related_name='timeslots_available' )
     appointment_date = models.DateTimeField()
     status = models.CharField(max_length=20)
     notes = models.TextField()
