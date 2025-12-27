@@ -43,10 +43,10 @@ class TimeSlot(models.Model):
 class Appointment(models.Model):
     appointment_id = models.IntegerField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='appointments')
-    service_offered = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service')
-    employee_available = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='employees available')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service')
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='employees available')
     # service_id = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service id')
-    time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE, related_name='timeslots_available' )
+    timeslot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE, related_name='timeslots_available' )
     appointment_date = models.DateTimeField()
     status = models.CharField(max_length=20)
     notes = models.TextField()

@@ -1,139 +1,176 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.http import JsonResponse
 import json
 
 from .models import Service, Appointment, Employee, TimeSlot, Notification
+from .forms import ServiceForm,AppointmentForm, EmployeeForm, TimeSlotForm, NotificationForm
 
 # Create your views here.
 
 class HomeView(TemplateView):
     template_name = 'booking/home.html'
 
-class ServiceListeView(ListView):
+class ServiceListView(LoginRequiredMixin, ListView):
     model = Service
-    template_name = 'booking/service_list.html'
     context_object_name = 'services'
+
+class ServiceCreateView(PermissionRequiredMixin, CreateView):
+    model = Service
+    form_class = ServiceForm
+    success_url = reverse_lazy('service-list')
+    permission_required = 'booking.add_service'
+    context_object_name = 'service'
+
+class ServiceUpdateView(PermissionRequiredMixin, UpdateView):
+    model = Service
+    form_class = ServiceForm
+    success_url = reverse_lazy('service-list')
+    permission_required = 'booking.change'
+    context_object_name = 'service'
+
+class ServiceDeleteView(PermissionRequiredMixin, DeleteView):
+    model = Service
+    success_url = reverse_lazy('service-list')
+    permission_required = 'booking.delete'
+    context_object_name = 'service'
+
+class TimeSlotListView(LoginRequiredMixin, ListView):
+    model = TimeSlot
+    context_object_name = 'timeslots'
+
+class TimeSlotCreateView(PermissionRequiredMixin, CreateView):
+    model = TimeSlot
+    form_class = TimeSlotForm
+    success_url = reverse_lazy('timeslot-list')
+    permission_required = 'booking.add-timeslot'
+    context_object_name = 'timeslot'
+
+class TimeSlotUpdateView(PermissionRequiredMixin, UpdateView):
+    model = TimeSlot
+    form_class = TimeSlotForm
+    success_url = reverse_lazy('timeslot-list')
+    permission_required = 'booking.change_timeslot'
+    context_object_name = 'timeslot'
+
+class TimeSlotDeleteView(PermissionRequiredMixin, DeleteView):
+    model = TimeSlot
+    success_url = reverse_lazy('timeslot-list')
+    permission_required = 'booking.delete_timeslot'
+    context_object_name = 'timeslot'
 
 class AppointmentListView(LoginRequiredMixin, ListView):
     model = Appointment
-    template_name = 'booking/appointment_list.html'
     context_object_name = 'appointments'
 
     def qet_queryset(self):
-        return Appointment.objects.filter(user=self.request.user).order_by('start_time')
-    
-class AppointmentDetailView(LoginRequiredMixin, DetailView):
-    model = Appointment
-    template_name = 'booking/appointment_details.html'
-    context_object_name = 'appointment' 
-
-    def get_queryset(self):
-        return self.model.objects.filter(user=self.request.user)
-    
-class AppointmentCancelView(LoginRequiredMixin, DeleteView):
-    model = Appointment
-    template_name = 'booking/cancel_appointment.html'
-    success_url = reverse_lazy('booking:my_appointments')
-
-    def get_queryset(self):
-        return self.model.objects.filter(user=self.request.user)
+        user = self.request.user
+        if user.is_staff:
+            return Appointment.objects.all()
+        elif hasattr(user, 'employee'):
+            return Appointment.objects.filter(employee=user.employee)
+        return Appointment.objects.filter(customer=user)
     
 class AppointmentCreateView(LoginRequiredMixin, CreateView):
     model = Appointment
-    fields = ['service_offered', 'employee_available,', 'time_slot']
-    template_name = 'booking/appoinment_booking.html' 
-    success_url = reverse_lazy('booking:my_appointments')
+    form_class = AppointmentForm
+    success_url = reverse_lazy('appointment-list')
+    context_object_name = 'appointment'
 
     def form_valid(self, form):
-        form.instance.user = self.request.user
-        form.instance.time_slot.is_booked = True
-        form.instance.time_slot.save()
+        user = self.request.user
+        if not user.is_staff and not hasattr(user, 'employee'):
+            form.instance.customer = user
         return super().form_valid(form)
     
-class AppointmentUpdateView(LoginRequiredMixin, UpdateView):
+class AppointmentUpdateView(PermissionRequiredMixin, UpdateView):
     model = Appointment
-    fields = ['service_offered', 'employee_available,', 'time_slot']
-    template_name = 'booking/appoinment_booking.html' 
-    success_url = reverse_lazy('booking:my_appointments')
+    form_class = AppointmentForm
+    success_url = reverse_lazy('appointment-list')
+    permission_required = 'booking.change-appointment'
+    context_object_name = 'appointmen'
 
-    def form_valid(self, form):
-        form.instance.user = self.request.user
-        form.instance.time_slot.is_booked = True
-        form.instance.time_slot.save()
-        return super().form_valid(form)
-    
-def load_available_timeslots(request):
-    employee_id = request.GET.get('emplyee_id')
-    service_id = request.GET.get('service_id')
-
-    timeslots = TimeSlot.objects.filter(employee_id=employee_id, is_booked= False, service_id=service_id).order_by('start_time')
-
-    data = [{
-        'id': time_slot.id,
-        'start_time': time_slot.start_time.strftime('Y-%m-%d %H:%M'),
-        'end_time': time_slot.end_time.strftime('%Y-%m-%d %H:%M'),
-    } for time_slot in timeslots]
-
-    return JsonResponse(data, safe=False)
-
-class NotificationListView(LoginRequiredMixin, ListView):
-    model = Notification
-    template_name = 'booking/notification_list.html'
-    context_object_name ='notifications'
-
-    def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
-    
-def mark_notification_as_read(request, pk):
-    notification = get_object_or_404(Notification, pk=pk, user=request.user)
-    if request.method ==  'POST':
-        notification.is_read = True
-        notification.save()
-
-        return redirect('booking:notification_list.html')
+class AppointmentDeleteView(PermissionRequiredMixin, DeleteView):
+    model = Appointment
+    success_url = reverse_lazy('appointment-lazy')
+    permission_required = 'booking.delete_appointment'
+    context_object_name = 'appointment'
     
 
-class EmployeeCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+class EmployeeCreateView(LoginRequiredMixin, CreateView):
     model = Employee
-    fields = ['name', 'specialization']
-    template_name = 'booking/employee_form.html'
-    success_url = reverse_lazy('booking:employee_list')
+    form_class = EmployeeForm
+    success_url = reverse_lazy('employee_list')
+    permission_required = 'booking.add_employee'
+    context_object_name = 'employee'
 
     def test_func(self):
         return self.request.user.is_staff
     
 class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Employee
-    template_name = 'booking/employee_list.html'
     context_object_name = 'employees'
 
     def get_queryset(self):
         return self.models.objects.filter(user=self.request.user).order_by()
     
-class EmployeeDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
-    model = Employee
-    template_name = 'booking/employee_details.html'
-    context_object_name = 'employees'
+# class EmployeeDetailView(LoginRequiredMixin, DetailView):
+#     model = Employee
+#     template_name = 'booking/employee_details.html'
+#     context_object_name = 'employees'
 
-    def get_queryset(self):
-        return self.models.objects.filter(user=self.request.user).order_by()
-    
-class EmployeeDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+#     def get_queryset(self):
+#         return self.models.objects.filter(user=self.request.user).order_by()
+ 
+class EmployeeUpdateView(LoginRequiredMixin, UpdateView):
+     model = Employee
+     form_class = EmployeeForm
+     success_url = reverse_lazy('employee_list')
+     permission_required = 'booking.change_employee'
+     context_object_name = 'employee'
+
+     def test_func(self):
+        return self.request.user.is_staff
+     
+   
+class EmployeeDeleteView(LoginRequiredMixin, DeleteView):
     model = Employee
-    template_name = 'booking/employee_removed.html'
-    success_url = reverse_lazy('booking:my_appointments')
+    success_url = reverse_lazy('employee-list')
+    permission_required = 'booking.delete_employee'
+    context_object_name = 'employee'
 
     def get_queryset(self):
         return self.models.objectss.filter(user=self.request.user).order_by()
     
-class EmployeeUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-     model = Employee
-     fields = ['name', 'specialization']
-     template_name = 'booking/employee_form.html'
-     success_url = reverse_lazy('booking:employee_list')
 
-     def test_func(self):
-        return self.request.user.is_staff
+class NotificationListView(LoginRequiredMixin, ListView):
+    model = Notification
+    context_object_name = 'notification-list'
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or hasattr(user, 'employee'):
+            return Notification.objects.all()
+        return Notification.objects.filter(user=user)
+    
+class NotificationCreateView(PermissionRequiredMixin, CreateView):
+    model = Notification
+    form_class = NotificationForm
+    success_url = reverse_lazy('notification-list')
+    permission_required = 'booking.add_notification'
+    context_object_name = 'notification'
+
+class NotificationUpdateView(PermissionRequiredMixin, UpdateView):
+    model = Notification
+    form_class = NotificationForm
+    success_url = reverse_lazy('notification-list')
+    permission_required = 'booking.change_notification'
+    context_object_name = 'notification'
+
+class NotificationDeleteView(PermissionRequiredMixin, DeleteView):
+    model = Notification
+    success_url = reverse_lazy('notification-list')
+    permission_required = 'booking.delete_notification'
+    context_object_name = 'notification'
