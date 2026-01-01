@@ -174,3 +174,55 @@ class NotificationDeleteView(PermissionRequiredMixin, DeleteView):
     success_url = reverse_lazy('notification-list')
     permission_required = 'booking.delete_notification'
     context_object_name = 'notification'
+
+
+
+
+class CalendarView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    template_name = 'appointments/calendar.html'
+    permission_required = 'appointments.view_appointment'
+
+def appointment_events(request):
+    user = request.user
+    if user.has_perm('appointments.view_appointment'):
+        appointments = Appointment.objects.all()
+    else:
+        appointments = Appointment.objects.filter(user=user)
+
+    events = []
+    for a in appointments:
+        events.append({
+            'title': f'{a.service.name} with {a.employee.name}',
+            'start': f'{a.timeslot.date}T{a.timeslot.start_time}',
+            'end': f'{a.timeslot.date}T{a.timeslot.end_time}',
+            'url': f'/appointments/{a.id}/edit/',
+            'color': '#3498db' if a.status=='confirmed' else '#e67e22',
+        })
+    return JsonResponse(events, safe=False)
+
+class AppointmentCreateAjax(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    model = Appointment
+    form_class = AppointmentForm
+    template_name = 'appointments/appointment_form_partial.html'
+    permission_required = 'appointments.add_appointment'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        date = self.request.GET.get('date')
+        if date:
+            initial['timeslot_date'] = date
+        return initial
+
+    def form_valid(self, form):
+        form.save()
+        return JsonResponse({'success': True, 'redirect': True})
+
+class AppointmentUpdateAjax(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    model = Appointment
+    form_class = AppointmentForm
+    template_name = 'appointments/appointment_form_partial.html'
+    permission_required = 'appointments.change_appointment'
+
+    def form_valid(self, form):
+        form.save()
+        return JsonResponse({'success': True, 'redirect': True})

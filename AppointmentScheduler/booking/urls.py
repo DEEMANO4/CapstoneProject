@@ -1,4 +1,5 @@
 from django.urls import path
+from . import views
 from .views import (ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView,
                     TimeSlotListView, TimeSlotCreateView, TimeSlotUpdateView, TimeSlotDeleteView,
                     EmployeeListView, EmployeeCreateView, EmployeeUpdateView, EmployeeDeleteView,
@@ -24,6 +25,10 @@ urlpatterns = [
     path('appointments/<int:pk>/delete/', AppointmentDeleteView.as_view(), name='appointment-delete'),
     path('notifications/', NotificationListView.as_view(), name='notification-list'),
     path('notifications/create/', NotificationCreateView.as_view(), name='notification-create'),
-    path('notifications/<int:pk/update/', NotificationUpdateView.as_view(), name='notification-update'),
+    path('notifications/<int:pk>/update/', NotificationUpdateView.as_view(), name='notification-update'),
     path('notifications/<int:pk>/delete/', NotificationDeleteView.as_view(), name='notification-delete'),
+    path('calendar/', views.CalendarView.as_view(), name='calendar'),
+    path('calendar/events/', views.appointment_events, name='calendar_events'),
+    path('appointments/add/', views.AppointmentCreateAjax.as_view(), name='appointment_add'),
+    path('appointments/<int:pk>/edit/', views.AppointmentUpdateAjax.as_view(), name='appointment_edit'),
 ]

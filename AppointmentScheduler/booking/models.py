@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 
 class Service(models.Model):
     service_id = models.IntegerField()
-    service_name = models.CharField(max_length=100)
+    service = models.CharField(max_length=100)
     duration = models.IntegerField(help_text="Duration in minutes")
     price = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
 
@@ -43,8 +43,8 @@ class TimeSlot(models.Model):
 class Appointment(models.Model):
     appointment_id = models.IntegerField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='appointments')
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service')
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='employees available')
+    services = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='services')
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='employees')
     # service_id = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service id')
     timeslot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE, related_name='timeslots_available' )
     appointment_date = models.DateTimeField()

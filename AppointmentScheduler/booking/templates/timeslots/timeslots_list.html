@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>TimeSlots</h2>
+<a class="btn" href="{% url 'timeslot_add' %}">Add TimeSlot</a>
+
+<table>
+<tr>
+    <th>Employee</th>
+    <th>Date</th>
+    <th>Start Time</th>
+    <th>End Time</th>
+    <th>Available</th>
+    <th>Actions</th>
+</tr>
+{% for t in object_list %}
+<tr>
+    <td>{{ t.employee }}</td>
+    <td>{{ t.date }}</td>
+    <td>{{ t.start_time }}</td>
+    <td>{{ t.end_time }}</td>
+    <td>{{ t.is_available|yesno:"Yes,No" }}</td>
+    <td>
+        <a class="btn" href="{% url 'timeslot_edit' t.id %}">Edit</a>
+        <a class="btn" href="{% url 'timeslot_delete' t.id %}">Delete</a>
+    </td>
+</tr>
+{% empty %}
+<tr><td colspan="6">No timeslots found.</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

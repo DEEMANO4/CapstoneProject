@@ -6,7 +6,7 @@ from django.utils import timezone
 class ServiceForm(forms.ModelForm):
     class Meta:
          model = Service
-         fields = ['service_name', 'price']
+         fields = ['service', 'price']
 
 class TimeSlotForm(forms.ModelForm):
     class Meta:
@@ -16,14 +16,14 @@ class TimeSlotForm(forms.ModelForm):
 class EmployeeForm(forms.ModelForm):
     class Meta:
         model = Employee
-        fields = ['name', 'service_offered', 'is_active']
+        fields = ['name', 'specialization', 'is_active']
 
 class AppointmentForm(forms.ModelForm):
     class Meta:
         model = Appointment
-        fields = ['user', 'employee', 'service', 'timslot']
+        fields = ['user', 'employee', 'services', 'timeslot']
         
 class NotificationForm(forms.ModelForm):
     class Meta:
         model = Notification
-        fields =['recepient', 'message', ' is_read']
+        fields =['recipient', 'message', 'is_read']
