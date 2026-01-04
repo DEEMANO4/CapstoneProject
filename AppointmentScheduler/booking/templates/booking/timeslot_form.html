@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 
-{% block title %}Form{% endblock %}
+{% block title %}Time Slot Form{% endblock %}
 
 {% block content %}
 <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
     <div class="sm:mx-auto sm:w-full sm:max-w-sm">
         <h2 class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900 dark:text-white">
-            {% if form.instance.pk %}Update{% else %}Add{% endif %} Employee
+            {% if form.instance.pk %}Update{% else %}Create{% endif %} Time Slot
         </h2>
     </div>
 
@@ -31,11 +31,6 @@
                 </div>
                 {% if field.help_text %}
                 <p class="mt-2 text-sm text-gray-500" id="{{ field.id_for_label }}_help">{{ field.help_text|safe }}</p>
-                {% endif %}
-                {% if field.errors %}
-                {% for error in field.errors %}
-                <p class="mt-2 text-sm text-red-600">{{ error }}</p>
-                {% endfor %}
                 {% endif %}
             </div>
             {% endfor %}

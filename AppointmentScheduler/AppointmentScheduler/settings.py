@@ -85,7 +85,7 @@ DATABASES = {
 }
 
 LOGIN_URL = 'login'               
-LOGIN_REDIRECT_URL = 'service-list'  # After login
+LOGIN_REDIRECT_URL = 'home'  # After login
 LOGOUT_REDIRECT_URL = 'login'        # After logout
 
 

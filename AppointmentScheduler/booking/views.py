@@ -16,6 +16,13 @@ from django.utils import timezone
 class HomeView(TemplateView):
     template_name = 'booking/home.html'
 
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        if not request.user.is_staff:
+             return redirect('appointment-list')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.now().date()
@@ -124,18 +131,24 @@ class AppointmentCreateView(LoginRequiredMixin, CreateView):
             self.object.timeslot.save()
         return response
     
-class AppointmentUpdateView(PermissionRequiredMixin, UpdateView):
+class AppointmentUpdateView(UserPassesTestMixin, UpdateView):
     model = Appointment
     form_class = AppointmentForm
     success_url = reverse_lazy('appointment-list')
-    permission_required = 'booking.change-appointment'
     context_object_name = 'appointment'
 
-class AppointmentDeleteView(PermissionRequiredMixin, DeleteView):
+    def test_func(self):
+        obj = self.get_object()
+        return self.request.user.is_staff or obj.user == self.request.user
+
+class AppointmentDeleteView(UserPassesTestMixin, DeleteView):
     model = Appointment
     success_url = reverse_lazy('appointment-list')
-    permission_required = 'booking.delete_appointment'
     context_object_name = 'appointment'
+
+    def test_func(self):
+        obj = self.get_object()
+        return self.request.user.is_staff or obj.user == self.request.user
 
     def form_valid(self, form):
         success_url = self.get_success_url()
@@ -229,9 +242,8 @@ class NotificationDeleteView(PermissionRequiredMixin, DeleteView):
 
 
 
-class CalendarView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class CalendarView(LoginRequiredMixin, TemplateView):
     template_name = 'appointments/calendar.html'
-    permission_required = 'booking.view_appointment'
 
 def appointment_events(request):
     user = request.user
@@ -263,11 +275,10 @@ def appointment_events(request):
             })
     return JsonResponse(events, safe=False)
 
-class AppointmentCreateAjax(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class AppointmentCreateAjax(LoginRequiredMixin, CreateView):
     model = Appointment
     form_class = AppointmentForm
     template_name = 'appointments/appointment_form_partial.html'
-    permission_required = 'appointments.add_appointment'
 
     def get_initial(self):
         initial = super().get_initial()
@@ -280,12 +291,29 @@ class AppointmentCreateAjax(LoginRequiredMixin, PermissionRequiredMixin, CreateV
         form.save()
         return JsonResponse({'success': True, 'redirect': True})
 
-class AppointmentUpdateAjax(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class AppointmentUpdateAjax(UserPassesTestMixin, UpdateView):
     model = Appointment
     form_class = AppointmentForm
     template_name = 'appointments/appointment_form_partial.html'
-    permission_required = 'appointments.change_appointment'
+
+    def test_func(self):
+        obj = self.get_object()
+        return self.request.user.is_staff or obj.user == self.request.user
 
     def form_valid(self, form):
         form.save()
         return JsonResponse({'success': True, 'redirect': True})
+
+def load_timeslots(request):
+    employee_id = request.GET.get('employee_id')
+    date_str = request.GET.get('date')
+    timeslots = TimeSlot.objects.none()
+    
+    if employee_id and date_str:
+        try:
+            # Parse date if necessary, but standard YYYY-MM-DD works with Django filters
+            timeslots = TimeSlot.objects.filter(employee_id=employee_id, date=date_str, is_booked=False).order_by('start_time')
+        except Exception as e:
+            pass # Invalid data
+            
+    return JsonResponse(list(timeslots.values('id', 'start_time', 'end_time')), safe=False)

@@ -22,7 +22,12 @@ class ServiceForm(TailwindFormMixin, forms.ModelForm):
 class TimeSlotForm(TailwindFormMixin, forms.ModelForm):
     class Meta:
         model = TimeSlot
-        fields = ['start_time', 'end_time', 'date']
+        fields = ['employee', 'date', 'start_time', 'end_time']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time'}),
+            'end_time': forms.TimeInput(attrs={'type': 'time'}),
+        }
 
 class EmployeeForm(TailwindFormMixin, forms.ModelForm):
     class Meta:
@@ -32,28 +37,51 @@ class EmployeeForm(TailwindFormMixin, forms.ModelForm):
 class AppointmentForm(TailwindFormMixin, forms.ModelForm):
     class Meta:
         model = Appointment
-        fields = ['employee', 'services', 'timeslot', 'appointment_date', 'status', 'notes']
+        fields = ['employee', 'services', 'appointment_date', 'timeslot', 'status', 'notes']
         widgets = {
              'appointment_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['appointment_date'].required = False
         # Filter to show only unbooked timeslots, plus the current one if we are editing
         if self.instance and self.instance.pk and self.instance.timeslot:
             self.fields['timeslot'].queryset = TimeSlot.objects.filter(models.Q(is_booked=False) | models.Q(pk=self.instance.timeslot.pk))
+        elif 'timeslot' in self.data:
+            try:
+                timeslot_id = int(self.data.get('timeslot'))
+                self.fields['timeslot'].queryset = TimeSlot.objects.filter(models.Q(is_booked=False) | models.Q(pk=timeslot_id))
+            except (ValueError, TypeError):
+                self.fields['timeslot'].queryset = TimeSlot.objects.filter(is_booked=False)
         else:
-            self.fields['timeslot'].queryset = TimeSlot.objects.filter(is_booked=False)
+             self.fields['timeslot'].queryset = TimeSlot.objects.none()
 
-    def clean_timeslot(self):
-        timeslot = self.cleaned_data.get('timeslot')
-        if timeslot and timeslot.is_booked:
-            # Check if we are editing and this is our own timeslot
-            if self.instance and self.instance.timeslot == timeslot:
-                pass
-            else:
-                raise forms.ValidationError("This time slot has already been booked.")
-        return timeslot
+    def clean(self):
+        cleaned_data = super().clean()
+        timeslot = cleaned_data.get('timeslot')
+        appointment_date = cleaned_data.get('appointment_date')
+
+        if timeslot:
+            # If a timeslot is selected, override appointment_date with timeslot's datetime
+            import datetime
+            # Combine date and time
+            dt = datetime.datetime.combine(timeslot.date, timeslot.start_time)
+            if timezone.is_naive(dt):
+                dt = timezone.make_aware(dt)
+            cleaned_data['appointment_date'] = dt
+            
+            # Check availability (redundant but safe)
+            if timeslot.is_booked:
+                # Allow if editing the same instance
+                if self.instance and self.instance.timeslot == timeslot:
+                    pass
+                else:
+                    self.add_error('timeslot', "This time slot has already been booked.")
+        elif not appointment_date:
+             self.add_error('appointment_date', "Please select a time slot OR enter a manual date/time.")
+        
+        return cleaned_data
         
 class NotificationForm(TailwindFormMixin, forms.ModelForm):
     class Meta:

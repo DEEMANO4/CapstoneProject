@@ -5,8 +5,9 @@
 {% block content %}
 <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
     <div class="sm:mx-auto sm:w-full sm:max-w-sm">
-        <h2 class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900 dark:text-white">{{
-            view.model.__name__ }} Form</h2>
+        <h2 class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900 dark:text-white">
+            {% if form.instance.pk %}Update{% else %}Book{% endif %} Appointment
+        </h2>
     </div>
 
     <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-lg">
@@ -46,4 +47,54 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const employeeSelect = document.getElementById('id_employee');
+        const dateInput = document.getElementById('id_appointment_date');
+        const timeslotSelect = document.getElementById('id_timeslot');
+
+        function loadTimeSlots() {
+            const employeeId = employeeSelect.value;
+            const dateTimeValue = dateInput.value; // Format: YYYY-MM-DDTHH:MM
+
+            if (employeeId && dateTimeValue) {
+                // Extract just the date part (YYYY-MM-DD)
+                const datePart = dateTimeValue.split('T')[0];
+
+                fetch(`{% url 'ajax_load_timeslots' %}?employee_id=${employeeId}&date=${datePart}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Clear existing options
+                        timeslotSelect.innerHTML = '<option value="">---------</option>';
+
+                        if (data.length > 0) {
+                            data.forEach(slot => {
+                                const option = document.createElement('option');
+                                option.value = slot.id;
+                                // Format time nicely
+                                option.text = `${slot.start_time.substring(0, 5)} - ${slot.end_time.substring(0, 5)}`;
+                                timeslotSelect.appendChild(option);
+                            });
+                        } else {
+                            const option = document.createElement('option');
+                            option.text = "No available slots";
+                            timeslotSelect.appendChild(option);
+                        }
+                    });
+            }
+        }
+
+        if (employeeSelect && dateInput && timeslotSelect) {
+            employeeSelect.addEventListener('change', loadTimeSlots);
+            dateInput.addEventListener('change', loadTimeSlots);
+            // Trigger on load if values exist (e.g. edit mode)
+            if (employeeSelect.value && dateInput.value) {
+                loadTimeSlots();
+            }
+        }
+    });
+</script>
 {% endblock %}
