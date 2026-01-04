@@ -10,12 +10,37 @@ from .forms import ServiceForm,AppointmentForm, EmployeeForm, TimeSlotForm, Noti
 
 # Create your views here.
 
+from django.db.models import Count, Sum
+from django.utils import timezone
+
 class HomeView(TemplateView):
     template_name = 'booking/home.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.now().date()
+        
+        context['total_appointments'] = Appointment.objects.count()
+        context['upcoming_appointments'] = Appointment.objects.filter(appointment_date__gte=today).count()
+        context['total_employees'] = Employee.objects.filter(is_active=True).count()
+        
+        revenue = Appointment.objects.filter(status='active').aggregate(
+            total_revenue=Sum('services__price')
+        )['total_revenue']
+        context['total_revenue'] = revenue if revenue else 0
+        
+        return context
 
 class ServiceListView(LoginRequiredMixin, ListView):
     model = Service
     context_object_name = 'services'
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(service__icontains=q)
+        return queryset
 
 class ServiceCreateView(PermissionRequiredMixin, CreateView):
     model = Service
@@ -65,13 +90,23 @@ class AppointmentListView(LoginRequiredMixin, ListView):
     model = Appointment
     context_object_name = 'appointments'
 
-    def qet_queryset(self):
+    def get_queryset(self):
         user = self.request.user
+        queryset = Appointment.objects.none()
         if user.is_staff:
-            return Appointment.objects.all()
+            queryset = Appointment.objects.all()
         elif hasattr(user, 'employee'):
-            return Appointment.objects.filter(employee=user.employee)
-        return Appointment.objects.filter(customer=user)
+            queryset = Appointment.objects.filter(employee=user.employee)
+        else:
+            queryset = Appointment.objects.filter(user=user)
+        
+        q = self.request.GET.get('q')
+        if q:
+             queryset = queryset.filter(
+                models.Q(services__service__icontains=q) | 
+                models.Q(employee__name__icontains=q)
+             )
+        return queryset
     
 class AppointmentCreateView(LoginRequiredMixin, CreateView):
     model = Appointment
@@ -81,40 +116,56 @@ class AppointmentCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         user = self.request.user
-        if not user.is_staff and not hasattr(user, 'employee'):
-            form.instance.customer = user
-        return super().form_valid(form)
+        # Automatically assign the logged-in user to the appointment
+        form.instance.user = user
+        response = super().form_valid(form)
+        if self.object.timeslot:
+            self.object.timeslot.is_booked = True
+            self.object.timeslot.save()
+        return response
     
 class AppointmentUpdateView(PermissionRequiredMixin, UpdateView):
     model = Appointment
     form_class = AppointmentForm
     success_url = reverse_lazy('appointment-list')
     permission_required = 'booking.change-appointment'
-    context_object_name = 'appointmen'
+    context_object_name = 'appointment'
 
 class AppointmentDeleteView(PermissionRequiredMixin, DeleteView):
     model = Appointment
-    success_url = reverse_lazy('appointment-lazy')
+    success_url = reverse_lazy('appointment-list')
     permission_required = 'booking.delete_appointment'
     context_object_name = 'appointment'
+
+    def form_valid(self, form):
+        success_url = self.get_success_url()
+        if self.object.timeslot:
+             self.object.timeslot.is_booked = False
+             self.object.timeslot.save()
+        self.object.delete()
+        return redirect(success_url)
     
 
 class EmployeeCreateView(LoginRequiredMixin, CreateView):
     model = Employee
     form_class = EmployeeForm
-    success_url = reverse_lazy('employee_list')
+    success_url = reverse_lazy('employee-list')
     permission_required = 'booking.add_employee'
     context_object_name = 'employee'
 
     def test_func(self):
         return self.request.user.is_staff
     
-class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+class EmployeeListView(LoginRequiredMixin, ListView):
     model = Employee
     context_object_name = 'employees'
 
     def get_queryset(self):
-        return self.models.objects.filter(user=self.request.user).order_by()
+        queryset = self.model.objects.filter(is_active=True)
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(name__icontains=q)
+        return queryset
     
 # class EmployeeDetailView(LoginRequiredMixin, DetailView):
 #     model = Employee
@@ -127,7 +178,7 @@ class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 class EmployeeUpdateView(LoginRequiredMixin, UpdateView):
      model = Employee
      form_class = EmployeeForm
-     success_url = reverse_lazy('employee_list')
+     success_url = reverse_lazy('employee-list')
      permission_required = 'booking.change_employee'
      context_object_name = 'employee'
 
@@ -142,7 +193,7 @@ class EmployeeDeleteView(LoginRequiredMixin, DeleteView):
     context_object_name = 'employee'
 
     def get_queryset(self):
-        return self.models.objectss.filter(user=self.request.user).order_by()
+        return self.model.objects.filter(is_active=True)
     
 
 class NotificationListView(LoginRequiredMixin, ListView):
@@ -180,24 +231,36 @@ class NotificationDeleteView(PermissionRequiredMixin, DeleteView):
 
 class CalendarView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = 'appointments/calendar.html'
-    permission_required = 'appointments.view_appointment'
+    permission_required = 'booking.view_appointment'
 
 def appointment_events(request):
     user = request.user
-    if user.has_perm('appointments.view_appointment'):
+    if user.has_perm('booking.view_appointment'):
         appointments = Appointment.objects.all()
     else:
         appointments = Appointment.objects.filter(user=user)
 
     events = []
     for a in appointments:
-        events.append({
-            'title': f'{a.service.name} with {a.employee.name}',
-            'start': f'{a.timeslot.date}T{a.timeslot.start_time}',
-            'end': f'{a.timeslot.date}T{a.timeslot.end_time}',
-            'url': f'/appointments/{a.id}/edit/',
-            'color': '#3498db' if a.status=='confirmed' else '#e67e22',
-        })
+        start_time = None
+        end_time = None
+        
+        if a.timeslot:
+            start_time = f'{a.timeslot.date}T{a.timeslot.start_time}'
+            end_time = f'{a.timeslot.date}T{a.timeslot.end_time}'
+        elif a.appointment_date:
+            start_time = a.appointment_date.isoformat()
+            # Default to 1 hour duration if no timeslot/duration available
+            end_time = (a.appointment_date + __import__('datetime').timedelta(hours=1)).isoformat()
+            
+        if start_time and a.services and a.employee:
+            events.append({
+                'title': f'{a.services.service} with {a.employee.name}',
+                'start': start_time,
+                'end': end_time,
+                'url': f'/appointments/appointments/{a.id}/update/',
+                'color': '#3498db' if a.status=='active' else '#e67e22',
+            })
     return JsonResponse(events, safe=False)
 
 class AppointmentCreateAjax(LoginRequiredMixin, PermissionRequiredMixin, CreateView):

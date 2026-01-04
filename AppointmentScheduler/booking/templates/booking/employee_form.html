@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Form{% endblock %}
+
+{% block content %}
+<div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-sm">
+        <h2 class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900 dark:text-white">{{
+            view.model.__name__ }} Form</h2>
+    </div>
+
+    <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-lg">
+        <form class="space-y-6" method="POST">
+            {% csrf_token %}
+
+            {% if form.errors %}
+            <div class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400"
+                role="alert">
+                <span class="font-medium">Please fix the errors below:</span>
+                {{ form.errors }}
+            </div>
+            {% endif %}
+
+            {% for field in form %}
+            <div>
+                <label for="{{ field.id_for_label }}"
+                    class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ field.label }}</label>
+                <div class="mt-2">
+                    {{ field }}
+                </div>
+                {% if field.help_text %}
+                <p class="mt-2 text-sm text-gray-500" id="{{ field.id_for_label }}_help">{{ field.help_text|safe }}</p>
+                {% endif %}
+                {% if field.errors %}
+                {% for error in field.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ error }}</p>
+                {% endfor %}
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div>
+                <button type="submit"
+                    class="flex w-full justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

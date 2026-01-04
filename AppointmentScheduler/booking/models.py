@@ -5,17 +5,17 @@ from django.contrib.auth import get_user_model
 # Create your models here.
 
 class Service(models.Model):
-    service_id = models.IntegerField()
+    service_id = models.IntegerField(null=True, blank=True)
     service = models.CharField(max_length=100)
     duration = models.IntegerField(help_text="Duration in minutes")
     price = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return self.service
 
 class Employee(models.Model):
     name = models.CharField(max_length=100)
-    employee_id = models.IntegerField()
+    employee_id = models.IntegerField(null=True, blank=True)
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     specialization = models.CharField(max_length=100)
@@ -41,19 +41,24 @@ class TimeSlot(models.Model):
         return f"{self.employee.name} - {self.date} {self.start_time}-{self.end_time}"
 
 class Appointment(models.Model):
-    appointment_id = models.IntegerField()
+    STATUS_CHOICES = (
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+    )
+
+    appointment_id = models.IntegerField(null=True, blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='appointments')
-    services = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='services')
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='employees')
+    services = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='services', null=True, blank=True)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='employees', null=True, blank=True)
     # service_id = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service id')
-    timeslot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE, related_name='timeslots_available' )
+    timeslot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE, related_name='timeslots_available', null=True, blank=True)
     appointment_date = models.DateTimeField()
-    status = models.CharField(max_length=20)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     notes = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.service.name} for {self.user.username} on {self.start_time.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.services.service} for {self.user.username} on {self.appointment_date.strftime('%Y-%m-%d %H:%M')}"
 
 
 
